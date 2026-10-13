@@ -10,6 +10,7 @@
   "scripts": {
     "listen": "node --env-file-if-exists=.env src/cli.ts run",
     "quote": "node --env-file-if-exists=.env src/cli.ts quote",
+    "report": "node src/cli.ts report",
     "test": "node --test \"test/*.test.ts\""
   },
   "dependencies": {},

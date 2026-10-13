@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadConfig } from "./config.ts";
-import { loadPrices, quote, runOnce } from "./engine.ts";
+import { loadPrices, quote, runOnce, type RunResult } from "./engine.ts";
 import { LoootClient } from "./looot.ts";
 import { csv, emailDrafts, notify, table } from "./output.ts";
+import { renderReport } from "./report.ts";
 import { planCalls } from "./sources.ts";
 import { loadState, prune, saveState } from "./state.ts";
 import { usd } from "./util.ts";
@@ -16,12 +17,15 @@ Usage
   node src/cli.ts init                 write icp.json from the example
   node src/cli.ts quote                show every call a run makes and its maximum cost (free, no key)
   node src/cli.ts run                  run once, print new signals, save state
+  node src/cli.ts report               turn the last run.json into an HTML report (free, no key)
   node src/cli.ts balance              show your looot balance (free, needs LOOOT_TOKEN)
 
 Options
   --config <file>     ICP config (default icp.json)
   --state <file>      state file for dedupe and snapshots (default .signals/state.json)
-  --out <dir>         also write run.json, signals.csv and email-drafts.md into this folder
+  --out <dir>         also write run.json, signals.csv, email-drafts.md and report.html into this folder
+  --html <file>       write the HTML report to this file (run and report)
+  --from <file>       run.json to read for report (default out/run.json)
   --json              print the run as JSON instead of a table
   --csv               print CSV instead of a table
   --new-only          table shows only signals not seen in earlier runs
@@ -38,7 +42,7 @@ Env
 export function parseArgs(argv: string[]): { cmd: string; opts: Record<string, string | true> } {
   const opts: Record<string, string | true> = {};
   let cmd = "";
-  const withValue = new Set(["config", "state", "out", "limit"]);
+  const withValue = new Set(["config", "state", "out", "limit", "html", "from"]);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a.startsWith("--")) {
@@ -81,7 +85,7 @@ async function main(argv: string[], env: NodeJS.ProcessEnv): Promise<number> {
     return 0;
   }
 
-  if (cmd !== "quote" && cmd !== "run") {
+  if (cmd !== "quote" && cmd !== "run" && cmd !== "report") {
     console.error(`Unknown command "${cmd}".\n\n${HELP}`);
     return 1;
   }
@@ -90,16 +94,30 @@ async function main(argv: string[], env: NodeJS.ProcessEnv): Promise<number> {
   const now = new Date();
   const calls = planCalls(config, now);
   const prices = await loadPrices(calls, { baseUrl: env.LOOOT_API_URL, offline: Boolean(opts["offline-prices"]) });
+  const pricesSource = prices.source === "catalog" ? "live public catalog" : `dated fallback (${prices.asOf})`;
 
   if (cmd === "quote") {
     const q = quote(calls, prices);
-    console.log(`Prices: ${prices.source === "catalog" ? "live public catalog" : `dated fallback (${prices.asOf})`}`);
+    console.log(`Prices: ${pricesSource}`);
     console.log(`${"SOURCE".padEnd(16)}${"CALLS".padEnd(8)}MAX COST`);
     for (const [src, row] of Object.entries(q.bySource)) console.log(`${src.padEnd(16)}${String(row.calls).padEnd(8)}${row.maxMicros ? usd(row.maxMicros) : "free"}`);
     console.log(`\n${q.calls} calls (${q.paidCalls} paid), at most ${usd(q.maxMicros)} per run. Budget cap: ${usd(Math.round(config.budgetUsd * 1e6))}.`);
     if (q.maxMicros > config.budgetUsd * 1e6) console.log("The plan costs more than the budget: the last paid calls will be skipped. Raise budgetUsd or trim queries.");
     if (q.unpriced.length) console.log(`No known price for: ${q.unpriced.join(", ")}. These custom endpoints are not capped by the quote.`);
     console.log("No paid call was made.");
+    return 0;
+  }
+
+  if (cmd === "report") {
+    const from = resolve(String(opts.from ?? "out/run.json"));
+    if (!existsSync(from)) {
+      console.error(`${from} not found. Run first: node src/cli.ts run --out out`);
+      return 1;
+    }
+    const result = JSON.parse(readFileSync(from, "utf8")) as RunResult;
+    const html = resolve(String(opts.html ?? join(dirname(from), "report.html")));
+    writeFileSync(html, renderReport({ result, config, quote: quote(calls, prices), pricesSource, runs: loadState(statePath).runs }));
+    console.log(`Wrote ${html}`);
     return 0;
   }
 
@@ -114,6 +132,11 @@ async function main(argv: string[], env: NodeJS.ProcessEnv): Promise<number> {
     writeFileSync(join(dir, "run.json"), JSON.stringify(result, null, 2));
     writeFileSync(join(dir, "signals.csv"), csv(result));
     writeFileSync(join(dir, "email-drafts.md"), emailDrafts(result, config));
+  }
+  const htmlPath = opts.html ? resolve(String(opts.html)) : opts.out ? join(resolve(String(opts.out)), "report.html") : null;
+  if (htmlPath) {
+    mkdirSync(dirname(htmlPath), { recursive: true });
+    writeFileSync(htmlPath, renderReport({ result, config, quote: quote(calls, prices), pricesSource, runs: state.runs }));
   }
   const notes = opts["no-notify"] ? [] : await notify(result, config, env);
 

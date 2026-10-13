@@ -20,6 +20,7 @@ looot, dedupes against `.signals/state.json`, scores every signal with reasons a
    Without a token only Hacker News runs.
 4. Read `out/run.json`. Present the top signals with their `reasons`, and the `accounts` rollup.
    `out/email-drafts.md` holds drafts for new signals at `notify.minScore` or above. Nothing is sent.
+   `out/report.html` is the same run as a page the user can open in a browser.
 5. If most results are noise, tune `rules` (add negatives, raise `minScore`) and run again. A rerun
    on the same UTC day replays the same looot calls by idempotency key and is not charged twice.
 

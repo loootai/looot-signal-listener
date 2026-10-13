@@ -1,20 +1,35 @@
-![looot-signal-listener: find people who need what you sell, right now](docs/media/banner.png)
+![looot-signal-listener: the HTML report with scored leads, accounts and the quote dialog](docs/media/banner.png)
 
 # looot-signal-listener
 
 Finds people and companies that need what you sell right now, scores each one, and tells you why.
 
-![A 52-second walkthrough: quote, a free run, scored signals with reasons, the next-day diff, Slack, tests](docs/media/demo.gif)
+<table>
+<tr>
+<td width="50%"><img src="docs/media/card-leads.png" alt="Every lead comes with its reasons: the leads table with a reason chip for every point"></td>
+<td width="50%"><img src="docs/media/card-quote.png" alt="See the cost before you spend: the quote dialog, 24 calls, at most $0.0352"></td>
+</tr>
+<tr>
+<td><img src="docs/media/card-changes.png" alt="What changed since yesterday: linear.app and attio.com dropped lemlist and added a new enterprise line"></td>
+<td><img src="docs/media/card-slack.png" alt="New leads land in Slack: five new signals at score 40+, each with its top two reasons"></td>
+</tr>
+<tr>
+<td><img src="docs/media/card-config.png" alt="One file describes your buyer: the settings icp.json sets"></td>
+<td><img src="docs/media/card-actions.png" alt="Runs every weekday on GitHub Actions: the workflow and the costs of the last runs"></td>
+</tr>
+</table>
 
-The walkthrough mixes real output (quote, the free Hacker News run, the tests) with example data from the test fixtures (scored rows, the next-day diff, Slack). Each frame is labeled. The same video as MP4: [docs/media/demo.mp4](docs/media/demo.mp4).
+Every screenshot is the real HTML report (`node src/cli.ts report`), filled by running the test fixtures through the real engine twice, a day apart. That is why each one says "Demo data". The Slack card shows the real `slackPayload()` text for the same run.
+
+![A 24-second walkthrough of the report: leads, accounts, changes, sources, costs, settings, and the quote dialog](docs/media/demo.gif)
+
+The same walkthrough as MP4: [docs/media/demo.mp4](docs/media/demo.mp4).
 
 ## How it works, in three steps
 
 1. Describe your buyer once in `icp.json`: the pain phrases they use, the job titles that mean they have your problem, the accounts you watch.
 2. Run it. It asks Reddit, X, Hacker News, LinkedIn jobs, the news, a tech stack lookup and web pages, all through one looot key, and never spends past `budgetUsd`.
-3. Read the result. Each signal has a score from 0 to 100 and the reason for every point. New ones go to Slack, a webhook, CSV or email drafts. A GitHub Action runs it every weekday.
-
-![Diagram: icp.json to sources through one looot key, to dedupe and scoring with reasons, to outputs, repeated by a daily GitHub Action](docs/media/how-it-works.svg)
+3. Read the result. Each signal has a score from 0 to 100 and the reason for every point. Open `out/report.html`, or get new ones in Slack, a webhook, CSV or email drafts. A GitHub Action runs it every weekday.
 
 How it differs from the tool that gave it the idea: [COMPARISON.md](COMPARISON.md). Short version: theirs is better for a social-post inbox, ours for watching accounts change.
 
@@ -69,19 +84,51 @@ node src/cli.ts run --out out
 
 `quote` reads live prices from the public catalog and makes no paid call. This is real output for the example config:
 
-![Real output of node src/cli.ts quote: 24 calls, at most $0.0352 per run](docs/media/terminal-quote.png)
+```
+$ node src/cli.ts quote
+Prices: live public catalog
+SOURCE          CALLS   MAX COST
+reddit          4       $0.00752
+x               4       $0.00300
+hn              4       free
+linkedin_jobs   3       $0.00150
+funding         1       $0.00100
+leadership      2       $0.00200
+news            2       $0.00200
+techstack       2       $0.0178
+website         2       $0.00040
+
+24 calls (20 paid), at most $0.0352 per run. Budget cap: $0.2500.
+No paid call was made.
+```
 
 Without `LOOOT_TOKEN` only Hacker News runs, which is free. A real run on 2026-10-13 found 32 posts and kept none, because none reached the minimum score of 15. That is the filter doing its job:
 
-![Real output of node src/cli.ts run with no token: 4 free Hacker News calls, 32 posts found, 0 above the minimum score](docs/media/terminal-run.png)
+```
+$ node src/cli.ts run
+SCORE NEW  KIND           SOURCE        WHO                   TITLE
+(nothing at or above the minimum score)
 
-`out/` gets `run.json`, `signals.csv` and `email-drafts.md`. With a key, the terminal shows a table with the reasons under each row. The rows below are example data: the test fixtures run through the example config by the real engine and table code, not a live run.
+4 calls, $0.00 spent, 0 signals, 0 new
+  no LOOOT_TOKEN set, paid sources skipped
+  hn "cold email spam": 30 found
+  hn "email deliverability": 2 found
+  hn "open rates dropped": 0 found
+  hn "domain warmup": 0 found
+  done: 4 calls, $0.00 spent, 32 unique, 0 at or above score 15, 0 new
+```
 
-![Example data: scored signals table with a reason line under each row, and accounts grouped](docs/media/terminal-scored.png)
+`out/` gets `run.json`, `signals.csv`, `email-drafts.md` and `report.html`. With a key, the terminal also prints a table with the reasons under each row.
 
-On the next run, tech stacks and watched pages are compared with the last snapshot. Example data again:
+## The report
 
-![Example data: the next run reports linear.app and attio.com dropped lemlist, and new enterprise text on two pages](docs/media/terminal-second.png)
+`report.html` is one static file: no server, no JavaScript framework, nothing loaded from the network. It has the leads with a reason chip for every point, accounts with what changed since the last run, the tech stack and page diffs, the quote per source, the cost of earlier runs, and the settings from `icp.json`. "Run now" opens the quote for the next run and the command to start it. The page cannot spend money by itself.
+
+```bash
+node src/cli.ts run --out out              # writes out/report.html with the run
+node src/cli.ts report                     # rebuilds it from out/run.json, free, no key
+node src/cli.ts report --from out/run.json --html ~/Desktop/signals.html
+```
 
 ## The config
 
@@ -109,14 +156,11 @@ The config refuses anything that looks like a token or webhook URL. Secrets go i
 ## Outputs
 
 - Terminal table, or `--json`, or `--csv`.
-- `--out <dir>` writes `run.json`, `signals.csv`, `email-drafts.md`.
+- `--out <dir>` writes `run.json`, `signals.csv`, `email-drafts.md`, `report.html`.
+- `--html <file>` writes the HTML report anywhere.
 - `SLACK_WEBHOOK_URL` set: posts new signals to Slack.
 - `SIGNAL_WEBHOOK_URL` set: posts JSON to any URL (n8n, Zapier, Make, a CRM).
 - Email drafts are starting points per signal kind. Nothing is sent.
-
-The Slack message, rendered from the real `slackPayload()` text with example data:
-
-![Example data: a Slack message listing 5 new signals at score 40+, each with its top two reasons](docs/media/slack-example.png)
 
 ## Run it on a schedule
 
@@ -138,13 +182,17 @@ On your own machine, cron works the same way:
 node --test "test/*.test.ts"
 ```
 
-38 tests. Every HTTP call is faked, and any real network call fails the test.
+44 tests. Every HTTP call is faked, and any real network call fails the test.
 
-![Real output of the test run: 38 pass, 0 fail](docs/media/terminal-tests.png)
+```
+ℹ tests 44
+ℹ pass 44
+ℹ fail 0
+```
 
 ## What it does not do yet
 
-- No web UI and no lead status (contacted, replied). Use the CSV or the webhook.
+- The report is read-only. No lead status (contacted, replied) yet. Use the CSV or the webhook.
 - One page per query. No paging.
 - The response shapes of the paid endpoints are parsed from provider docs and two sibling looot tools. The looot catalog marks them unverified, and this repo has not had a live paid run yet.
 - No LinkedIn posts, Facebook or Instagram built in. Add them as custom sources.

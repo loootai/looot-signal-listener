@@ -36,8 +36,8 @@ If you mostly want social posts and a lead inbox, theirs is the better tool toda
 | Account rollup | No, each post stands alone | Yes, company signals grouped, more kinds score higher |
 | Dedupe | Per source and provider id | Across sources by canonical URL, and across runs |
 | Lead workflow | Status (new, qualified, contacted, replied, ignored), notes, filters | None |
-| UI | Local web UI, English and Chinese | Terminal table only |
-| Outputs | UI, CSV and JSON export, local JSON API | Table, JSON, CSV, Slack, generic webhook, email drafts |
+| UI | Local web UI, English and Chinese | Terminal table and a static, read-only HTML report |
+| Outputs | UI, CSV and JSON export, local JSON API | Table, HTML report, JSON, CSV, Slack, generic webhook, email drafts |
 | Cost shown before a run | No | Yes, `quote` lists every call and the maximum cost from live catalog prices |
 | Spend caps | Per-call cap enforced by Treg, per-run budget | Per-run budget checked before each call; pinned endpoints with no fallback routing |
 | Repeat runs not billed twice | Same query within an hour, by idempotency key | Same call on the same UTC day, by idempotency key |
@@ -45,7 +45,7 @@ If you mostly want social posts and a lead inbox, theirs is the better tool toda
 | Schedule | In-app scheduler while the server runs, or `--run-once` from cron | Shipped GitHub Action with state in the Actions cache, or cron |
 | Agent setup | AGENT_SETUP.md, a long interview playbook | A short Claude Code skill |
 | Tests | 5 Python test files | 38 tests, all HTTP faked |
-| Size | About 1,570 lines of Python plus a 62 KB HTML UI | About 1,300 lines of TypeScript plus 500 lines of tests |
+| Size | About 1,570 lines of Python plus a 62 KB HTML UI | About 1,580 lines of TypeScript (the HTML report included) plus 580 lines of tests |
 | Proven on real data | Yes. README shows a real run: 284 leads for $0.073 | No. Fixtures only. The looot catalog marks every paid response shape used here as unverified |
 | Stars, activity | 62 stars, 5 forks, 19 commits, all on 2026-10-10 | Not published |
 
@@ -81,7 +81,7 @@ Account watching costs per account, not per lead: $0.0089 per tech stack check a
 
 ## Where theirs wins
 
-- A real UI with a lead inbox. You can mark leads contacted, add notes, filter and rescore. Ours has none of that.
+- A real UI with a lead inbox. You can mark leads contacted, add notes, filter and rescore. Ours has a read-only HTML report and none of that.
 - More social sources out of the box: LinkedIn posts, Facebook posts and groups, Instagram hashtags and reels. Ours covers those only if you write the field map yourself.
 - Paging. They fetch up to 10 pages per keyword. We fetch one, so a busy keyword returns fewer posts.
 - Free RSS and import. Google Alerts, subreddit feeds and leads from other tools come in at no cost.
@@ -103,4 +103,4 @@ Account watching costs per account, not per lead: $0.0089 per tech stack check a
 
 ## What would close the gaps
 
-In order of value: one live paid run to verify the parsers and measure leads per dollar (under $0.05 with the example config); paging for Reddit and X; a LinkedIn posts source; a lead status field in the state file. A UI is the largest gap and the most work.
+In order of value: one live paid run to verify the parsers and measure leads per dollar (under $0.05 with the example config); paging for Reddit and X; a LinkedIn posts source; a lead status field in the state file. An interactive UI (lead status, notes, filters) is the largest gap and the most work.
