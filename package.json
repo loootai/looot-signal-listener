@@ -1,0 +1,17 @@
+{
+  "name": "looot-signal-listener",
+  "version": "0.1.0",
+  "description": "Buying signals for your ICP (intent posts, hiring, funding, leadership, tech stack and website changes), scored with reasons, through one looot key. Zero dependencies.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.18" },
+  "bin": { "looot-signal-listener": "src/cli.ts" },
+  "scripts": {
+    "listen": "node --env-file-if-exists=.env src/cli.ts run",
+    "quote": "node --env-file-if-exists=.env src/cli.ts quote",
+    "test": "node --test \"test/*.test.ts\""
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

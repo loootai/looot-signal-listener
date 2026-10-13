@@ -1,0 +1,76 @@
+{
+  "product": "Cold email deliverability audits for B2B SaaS sales teams",
+  "lookbackDays": 7,
+  "budgetUsd": 0.25,
+  "minScore": 15,
+  "icp": {
+    "personaWords": ["saas", "b2b", "sdr", "bdr", "outbound", "founder", "head of sales", "revops"],
+    "countries": ["US"]
+  },
+  "rules": {
+    "pain": {
+      "going to spam": 15,
+      "landing in spam": 15,
+      "open rates dropped": 12,
+      "open rate dropped": 12,
+      "domain reputation": 10,
+      "deliverability": 8,
+      "bounce rate": 8,
+      "blacklisted": 12,
+      "no replies": 8
+    },
+    "intent": {
+      "looking for": 10,
+      "any recommendations": 10,
+      "alternative to": 12,
+      "switching from": 12,
+      "anyone tried": 6,
+      "need help": 10,
+      "willing to pay": 12
+    },
+    "negative": {
+      "i built": -8,
+      "check out my": -10,
+      "we just launched": -6,
+      "giveaway": -15,
+      "open to work": -15,
+      "who is hiring": -30
+    }
+  },
+  "intent": {
+    "enabled": true,
+    "sources": ["reddit", "x", "hn"],
+    "queries": ["cold email spam", "email deliverability", "open rates dropped", "domain warmup"]
+  },
+  "hiring": {
+    "enabled": true,
+    "titles": ["SDR Manager", "Head of Sales Development", "RevOps Manager"],
+    "location": "United States"
+  },
+  "funding": { "enabled": true, "source": "news", "stages": ["seed", "Series A"], "limit": 20 },
+  "leadership": { "enabled": true, "roles": ["VP of Sales", "Head of Growth"] },
+  "accounts": {
+    "list": [
+      { "name": "Linear", "domain": "linear.app", "pages": ["https://linear.app/pricing"] },
+      { "name": "Attio", "domain": "attio.com", "pages": ["https://attio.com/careers"] }
+    ],
+    "news": true,
+    "techstack": true,
+    "website": true,
+    "watchTech": ["hubspot", "salesforce", "outreach", "apollo"],
+    "competitorTech": ["lemlist", "instantly", "smartlead"],
+    "pageKeywords": ["enterprise", "sales development", "outbound", "soc 2"]
+  },
+  "custom": [
+    {
+      "name": "youtube",
+      "enabled": false,
+      "kind": "intent",
+      "endpointId": "tikhub-api-youtube-web-search-video",
+      "input": { "search_query": "{q}", "order_by": "upload_date" },
+      "queries": ["cold email deliverability 2026"],
+      "fields": { "title": "title", "url": "url|link", "author": "channel_name|author" }
+    }
+  ],
+  "notify": { "minScore": 40, "slackWebhookEnv": "SLACK_WEBHOOK_URL", "webhookEnv": "SIGNAL_WEBHOOK_URL" }
+}
