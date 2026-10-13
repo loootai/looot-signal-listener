@@ -1,6 +1,22 @@
+![looot-signal-listener: find people who need what you sell, right now](docs/media/banner.png)
+
 # looot-signal-listener
 
 Finds people and companies that need what you sell right now, scores each one, and tells you why.
+
+![A 52-second walkthrough: quote, a free run, scored signals with reasons, the next-day diff, Slack, tests](docs/media/demo.gif)
+
+The walkthrough mixes real output (quote, the free Hacker News run, the tests) with example data from the test fixtures (scored rows, the next-day diff, Slack). Each frame is labeled. The same video as MP4: [docs/media/demo.mp4](docs/media/demo.mp4).
+
+## How it works, in three steps
+
+1. Describe your buyer once in `icp.json`: the pain phrases they use, the job titles that mean they have your problem, the accounts you watch.
+2. Run it. It asks Reddit, X, Hacker News, LinkedIn jobs, the news, a tech stack lookup and web pages, all through one looot key, and never spends past `budgetUsd`.
+3. Read the result. Each signal has a score from 0 to 100 and the reason for every point. New ones go to Slack, a webhook, CSV or email drafts. A GitHub Action runs it every weekday.
+
+![Diagram: icp.json to sources through one looot key, to dedupe and scoring with reasons, to outputs, repeated by a daily GitHub Action](docs/media/how-it-works.svg)
+
+How it differs from the tool that gave it the idea: [COMPARISON.md](COMPARISON.md). Short version: theirs is better for a social-post inbox, ours for watching accounts change.
 
 It listens for seven kinds of signal through one [looot](https://looot.ai) key:
 
@@ -20,7 +36,7 @@ Any other endpoint in the looot catalog can be added as a custom source in the c
 
 The example config makes 24 calls per run and costs at most $0.0352. `quote` prints that number before you spend anything.
 
-## How it works
+## What each run does
 
 ```
 icp.json ──> plan calls ──> quote (free) ──> run inside budgetUsd ──> parse
@@ -51,24 +67,21 @@ export LOOOT_TOKEN=...        # agent token from looot.ai, Settings, Agent token
 node src/cli.ts run --out out
 ```
 
-Without `LOOOT_TOKEN` only Hacker News runs, which is free.
+`quote` reads live prices from the public catalog and makes no paid call. This is real output for the example config:
 
-`out/` gets `run.json`, `signals.csv` and `email-drafts.md`. The terminal shows a table:
+![Real output of node src/cli.ts quote: 24 calls, at most $0.0352 per run](docs/media/terminal-quote.png)
 
-```
-SCORE NEW  KIND           SOURCE        WHO                   TITLE
-60    yes  intent         reddit        u/growthpm            Our cold emails are landing in spam, any recommendations?
-      why: +27 pain: "landing in spam", "open rates dropped"; +10 intent: "any recommendations"; +8 fits your buyer: saas, b2b
-      https://www.reddit.com/r/sales/comments/r1/x/
-44    yes  hiring         linkedin_jobs Attio                 Attio is hiring: Head of Sales Development
-      why: +20 hiring signal; +15 on your account list: Attio; +5 posted in the last 2 days
-      https://www.linkedin.com/jobs/view/222
+Without `LOOOT_TOKEN` only Hacker News runs, which is free. A real run on 2026-10-13 found 32 posts and kept none, because none reached the minimum score of 15. That is the filter doing its job:
 
-ACCOUNTS (company-level signals grouped)
-44    Attio                        1 signal: hiring
-```
+![Real output of node src/cli.ts run with no token: 4 free Hacker News calls, 32 posts found, 0 above the minimum score](docs/media/terminal-run.png)
 
-These rows come from the test fixtures run through the example config, not from a live run.
+`out/` gets `run.json`, `signals.csv` and `email-drafts.md`. With a key, the terminal shows a table with the reasons under each row. The rows below are example data: the test fixtures run through the example config by the real engine and table code, not a live run.
+
+![Example data: scored signals table with a reason line under each row, and accounts grouped](docs/media/terminal-scored.png)
+
+On the next run, tech stacks and watched pages are compared with the last snapshot. Example data again:
+
+![Example data: the next run reports linear.app and attio.com dropped lemlist, and new enterprise text on two pages](docs/media/terminal-second.png)
 
 ## The config
 
@@ -101,6 +114,10 @@ The config refuses anything that looks like a token or webhook URL. Secrets go i
 - `SIGNAL_WEBHOOK_URL` set: posts JSON to any URL (n8n, Zapier, Make, a CRM).
 - Email drafts are starting points per signal kind. Nothing is sent.
 
+The Slack message, rendered from the real `slackPayload()` text with example data:
+
+![Example data: a Slack message listing 5 new signals at score 40+, each with its top two reasons](docs/media/slack-example.png)
+
 ## Run it on a schedule
 
 `.github/workflows/listen.yml` runs every weekday at 07:00 UTC. Commit your `icp.json`, add `LOOOT_TOKEN` (and the webhook URLs if you want them) as repo secrets. The dedupe state lives in the Actions cache, and each run uploads `out/` as an artifact.
@@ -122,6 +139,8 @@ node --test "test/*.test.ts"
 ```
 
 38 tests. Every HTTP call is faked, and any real network call fails the test.
+
+![Real output of the test run: 38 pass, 0 fail](docs/media/terminal-tests.png)
 
 ## What it does not do yet
 
