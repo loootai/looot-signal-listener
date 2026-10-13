@@ -1,0 +1,184 @@
+{
+  "product": "One API key for business data (enrichment, search, scraping) for AI agents and GTM teams",
+  "lookbackDays": 7,
+  "budgetUsd": 0.25,
+  "minScore": 30,
+  "icp": {
+    "personaWords": [
+      "gtm",
+      "outbound",
+      "sdr",
+      "revops",
+      "growth",
+      "agent",
+      "agents",
+      "mcp",
+      "claude",
+      "cursor",
+      "n8n",
+      "lead gen"
+    ],
+    "countries": [
+      "US"
+    ]
+  },
+  "rules": {
+    "pain": {
+      "too expensive": 12,
+      "expensive": 6,
+      "credits": 6,
+      "rate limit": 6,
+      "enrichment": 8,
+      "waterfall": 8,
+      "data provider": 8,
+      "contact data": 8,
+      "scraping": 5,
+      "api key": 4
+    },
+    "intent": {
+      "looking for": 10,
+      "any recommendations": 10,
+      "recommend": 6,
+      "alternative to": 12,
+      "alternatives": 10,
+      "alternative": 8,
+      "switching from": 12,
+      "cheaper": 10,
+      "anyone tried": 6,
+      "anyone using": 6,
+      "need help": 10,
+      "how do i": 5,
+      "willing to pay": 12
+    },
+    "negative": {
+      "i built": -8,
+      "check out my": -10,
+      "we just launched": -6,
+      "giveaway": -15,
+      "airdrop": -20,
+      "open to work": -15,
+      "who is hiring": -30,
+      "seeking work": -20
+    }
+  },
+  "intent": {
+    "enabled": true,
+    "sources": [
+      "reddit",
+      "x"
+    ],
+    "queries": [
+      "clay alternative",
+      "cheaper enrichment api",
+      "data api for ai agents",
+      "mcp enrichment",
+      "apollo api alternative"
+    ]
+  },
+  "hiring": {
+    "enabled": true,
+    "titles": [
+      "GTM Engineer"
+    ],
+    "location": "United States"
+  },
+  "funding": {
+    "enabled": false,
+    "source": "news",
+    "stages": [],
+    "limit": 20
+  },
+  "leadership": {
+    "enabled": false,
+    "roles": []
+  },
+  "accounts": {
+    "list": [
+      {
+        "name": "Clay",
+        "domain": "clay.com",
+        "newsQuery": "\"Clay\" (GTM OR \"go-to-market\" OR \"Clay.com\" OR \"Clay Labs\")",
+        "pages": [
+          "https://www.clay.com/pricing"
+        ]
+      },
+      {
+        "name": "Apollo.io",
+        "domain": "apollo.io",
+        "pages": [
+          "https://www.apollo.io/pricing"
+        ],
+        "newsQuery": "\"Apollo.io\""
+      },
+      {
+        "name": "ZoomInfo",
+        "domain": "zoominfo.com",
+        "pages": []
+      },
+      {
+        "name": "Apify",
+        "domain": "apify.com",
+        "pages": [
+          "https://apify.com/pricing"
+        ]
+      },
+      {
+        "name": "Bright Data",
+        "domain": "brightdata.com",
+        "pages": []
+      },
+      {
+        "name": "Firecrawl",
+        "domain": "firecrawl.dev",
+        "pages": [
+          "https://www.firecrawl.dev/pricing"
+        ]
+      },
+      {
+        "name": "Exa",
+        "domain": "exa.ai",
+        "newsQuery": "\"Exa\" (\"Exa AI\" OR \"exa.ai\" OR \"search API\")",
+        "pages": [
+          "https://exa.ai/pricing"
+        ]
+      },
+      {
+        "name": "Tavily",
+        "domain": "tavily.com",
+        "pages": []
+      },
+      {
+        "name": "People Data Labs",
+        "domain": "peopledatalabs.com",
+        "pages": [],
+        "newsQuery": "\"People Data Labs\" -ranking -college"
+      },
+      {
+        "name": "Coresignal",
+        "domain": "coresignal.com",
+        "pages": []
+      }
+    ],
+    "news": true,
+    "techstack": false,
+    "website": true,
+    "watchTech": [],
+    "competitorTech": [
+      "clay",
+      "apollo",
+      "zoominfo"
+    ],
+    "pageKeywords": [
+      "agent",
+      "mcp",
+      "api",
+      "credits",
+      "enterprise"
+    ]
+  },
+  "notify": {
+    "minScore": 40,
+    "slackWebhookEnv": "SLACK_WEBHOOK_URL",
+    "webhookEnv": "SIGNAL_WEBHOOK_URL"
+  }
+}

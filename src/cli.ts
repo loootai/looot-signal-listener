@@ -4,6 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadConfig } from "./config.ts";
 import { loadPrices, quote, runOnce, type RunResult } from "./engine.ts";
+import { loadLogos } from "./logos.ts";
 import { LoootClient } from "./looot.ts";
 import { csv, emailDrafts, notify, table } from "./output.ts";
 import { renderReport } from "./report.ts";
@@ -31,6 +32,10 @@ Options
   --new-only          table shows only signals not seen in earlier runs
   --limit <n>         rows in the table (default 25)
   --no-notify         do not post to Slack or the webhook
+  --logos <dir>       show company logos in the HTML report: read <dir>/<domain>.png, fetch a missing one from
+                      Google's favicon service and cache it there. Without it the report shows names only.
+  --label <text>      a pill in the report's top bar, for example "Live run · 2026-10-13"
+  --redact            HTML report hides post authors, @handles, emails and phone numbers (for screenshots you share)
   --offline-prices    use the dated prices in src/sources.ts instead of reading the public catalog
 
 Env
@@ -42,7 +47,7 @@ Env
 export function parseArgs(argv: string[]): { cmd: string; opts: Record<string, string | true> } {
   const opts: Record<string, string | true> = {};
   let cmd = "";
-  const withValue = new Set(["config", "state", "out", "limit", "html", "from"]);
+  const withValue = new Set(["config", "state", "out", "limit", "html", "from", "logos", "label"]);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a.startsWith("--")) {
@@ -53,6 +58,12 @@ export function parseArgs(argv: string[]): { cmd: string; opts: Record<string, s
     } else if (!cmd) cmd = a;
   }
   return { cmd: cmd || "help", opts };
+}
+
+/** Logos for the watched accounts and the accounts in the run, only when --logos <dir> is given. */
+async function logosFor(result: RunResult, config: ReturnType<typeof loadConfig>, opts: Record<string, string | true>): Promise<Record<string, string> | undefined> {
+  if (typeof opts.logos !== "string") return undefined;
+  return loadLogos([...config.accounts.list.map((a) => a.domain), ...result.accounts.map((a) => a.domain)], resolve(opts.logos), { online: true });
 }
 
 async function main(argv: string[], env: NodeJS.ProcessEnv): Promise<number> {
@@ -116,7 +127,8 @@ async function main(argv: string[], env: NodeJS.ProcessEnv): Promise<number> {
     }
     const result = JSON.parse(readFileSync(from, "utf8")) as RunResult;
     const html = resolve(String(opts.html ?? join(dirname(from), "report.html")));
-    writeFileSync(html, renderReport({ result, config, quote: quote(calls, prices), pricesSource, runs: loadState(statePath).runs }));
+    const logos = await logosFor(result, config, opts);
+    writeFileSync(html, renderReport({ result, config, quote: quote(calls, prices), pricesSource, runs: loadState(statePath).runs, logos, redact: Boolean(opts.redact), label: typeof opts.label === "string" ? opts.label : undefined }));
     console.log(`Wrote ${html}`);
     return 0;
   }
@@ -136,7 +148,8 @@ async function main(argv: string[], env: NodeJS.ProcessEnv): Promise<number> {
   const htmlPath = opts.html ? resolve(String(opts.html)) : opts.out ? join(resolve(String(opts.out)), "report.html") : null;
   if (htmlPath) {
     mkdirSync(dirname(htmlPath), { recursive: true });
-    writeFileSync(htmlPath, renderReport({ result, config, quote: quote(calls, prices), pricesSource, runs: state.runs }));
+    const logos = await logosFor(result, config, opts);
+    writeFileSync(htmlPath, renderReport({ result, config, quote: quote(calls, prices), pricesSource, runs: state.runs, logos, redact: Boolean(opts.redact), label: typeof opts.label === "string" ? opts.label : undefined }));
   }
   const notes = opts["no-notify"] ? [] : await notify(result, config, env);
 

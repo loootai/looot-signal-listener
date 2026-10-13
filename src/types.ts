@@ -33,6 +33,8 @@ export interface Account {
   name: string;
   domain: string | null;
   pages?: string[];
+  /** Google News query for this account. Default is the quoted name; set it when the name is a common word (Clay, Exa). */
+  newsQuery?: string;
 }
 
 /** The whole ICP and listener config, read from icp.json. */

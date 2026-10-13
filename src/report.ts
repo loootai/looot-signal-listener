@@ -14,6 +14,10 @@ export interface ReportInput {
   runs?: State["runs"];
   /** A pill in the top bar, for example "Demo data" when the page is built from fixtures. */
   label?: string;
+  /** Company logos as data URIs, keyed by domain (see loadLogos). Optional: without them the report shows names only. */
+  logos?: Record<string, string>;
+  /** Hide who wrote a social post (usernames, @handles, emails, phone numbers) and shorten post titles, for screenshots you publish. */
+  redact?: boolean;
 }
 
 /** Escapes text for HTML element content and attribute values. */
@@ -24,10 +28,23 @@ export function esc(v: unknown): string {
 /** An href for http and https URLs only; anything else renders as plain text. */
 const safeUrl = (u: string | null | undefined): string | null => (u && /^https?:\/\//i.test(u) ? u : null);
 
+/** Removes emails, phone numbers, @handles and u/usernames from text and cuts it to `max` characters. */
+export function redactText(t: string, max = 140): string {
+  const clean = t
+    .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, "[email]")
+    .replace(/\+?\d[\d\s().-]{7,}\d/g, (m) => (m.replace(/\D/g, "").length >= 9 ? "[phone]" : m))
+    .replace(/(^|[^\w])@\w{1,30}/g, "$1@…")
+    .replace(/\bu\/[\w-]+/g, "u/…")
+    .replace(/\s+/g, " ")
+    .trim();
+  return clean.length > max ? `${clean.slice(0, max - 1).trimEnd()}…` : clean;
+}
+
 const KIND_LABEL: Record<Kind, string> = { intent: "Intent", hiring: "Hiring", funding: "Funding", leadership: "Leadership", news: "News", tech_change: "Tech change", website_change: "Page change" };
 const KIND_COLOR: Record<Kind, string> = { intent: "#2f6fde", hiring: "#d98a1f", funding: "#12a06a", leadership: "#3b8c8c", news: "#5f6b7a", tech_change: "#7a8b2e", website_change: "#8a5a44" };
 
-const who = (s: Signal) => (s.kind === "intent" ? s.author ?? s.company : s.company ?? s.domain ?? s.author) ?? "";
+const who = (s: Signal, redact = false) => (s.kind === "intent" ? (redact ? s.company : s.author ?? s.company) : s.company ?? s.domain ?? (redact ? null : s.author)) ?? "";
+const shownTitle = (s: Signal, redact = false) => (redact && s.kind === "intent" ? redactText(s.title) : s.title);
 const kindChip = (k: Kind) => `<span class="kind" style="--k:${KIND_COLOR[k]}">${KIND_LABEL[k]}</span>`;
 const scorePill = (n: number | undefined) => `<span class="score${(n ?? 0) >= 60 ? " hot" : ""}">${n ?? 0}</span>`;
 const reasonChips = (s: Signal, n = 4) =>
@@ -36,9 +53,17 @@ const reasonChips = (s: Signal, n = 4) =>
     .slice(0, n)
     .map((r) => `<span class="reason"><b class="${r.points < 0 ? "neg" : ""}">${r.points > 0 ? "+" : ""}${r.points}</b> ${esc(r.why)}</span>`)
     .join("");
-const titleLink = (s: Signal) => {
-  const href = safeUrl(s.url);
-  return href ? `<a href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(s.title)}</a>` : esc(s.title);
+const titleLink = (s: Signal, redact = false) => {
+  // A post URL can hold the author's handle (x.com/<handle>/status/...), so a redacted post is not linked.
+  const href = redact && s.kind === "intent" ? null : safeUrl(s.url);
+  const t = esc(shownTitle(s, redact));
+  return href ? `<a href="${esc(href)}" target="_blank" rel="noopener noreferrer">${t}</a>` : t;
+};
+
+/** An <img> for a logo when one is given as a data URI. Anything else renders nothing, so the page never loads from the network. */
+const logoImg = (logos: Record<string, string> | undefined, domain: string | null | undefined, cls = "lg") => {
+  const src = domain ? logos?.[domain] : undefined;
+  return src && /^data:image\/(png|jpeg|gif|webp|x-icon);base64,[A-Za-z0-9+/=]+$/.test(src) ? `<img class="${cls}" src="${src}" alt="" width="16" height="16">` : "";
 };
 
 /** The before/after lines of a tech or page change: removed in red, added in green. */
@@ -59,11 +84,13 @@ const NAV = [
   ["settings", "Settings"],
 ] as const;
 
-const detailItem = (s: Signal) => `<div class="item">${kindChip(s.kind)}<div class="t">${titleLink(s)}</div>${diffLines(s)}<div class="reasons">${reasonChips(s, 3)}</div></div>`;
+const detailItem = (s: Signal, redact = false) => `<div class="item">${kindChip(s.kind)}<div class="t">${titleLink(s, redact)}</div>${diffLines(s)}<div class="reasons">${reasonChips(s, 3)}</div></div>`;
 
 /** A static, dependency-free HTML report of one run: leads with reasons, accounts, changes, sources, costs and the config. */
 export function renderReport(i: ReportInput): string {
-  const { result: r, config: c, quote: q, runs = [] } = i;
+  const { result: r, config: c, quote: q, runs = [], logos, redact = false } = i;
+  const hasLogos = Boolean(logos && Object.keys(logos).length);
+  const domainOf = (s: Signal) => s.domain ?? c.accounts.list.find((a) => s.company && a.name.toLowerCase() === s.company.toLowerCase())?.domain ?? null;
   const fresh = r.signals.filter((s) => s.isNew);
   const changes = r.signals.filter((s) => s.kind === "tech_change" || s.kind === "website_change");
   const budget = Math.round(c.budgetUsd * 1e6);
@@ -77,25 +104,25 @@ export function renderReport(i: ReportInput): string {
       (s) => `<tr${s.isNew ? ' class="new"' : ""}>
 <td>${scorePill(s.score)}</td>
 <td>${kindChip(s.kind)}</td>
-<td><div class="t">${titleLink(s)}${s.isNew ? ' <span class="badge">new</span>' : ""}</div><div class="meta"><span class="num">${esc(s.source)}</span> · ${esc(who(s))}</div><div class="reasons">${reasonChips(s)}</div></td>
+<td><div class="t">${titleLink(s, redact)}${s.isNew ? ' <span class="badge">new</span>' : ""}</div><div class="meta"><span class="num">${esc(s.source)}</span>${who(s, redact) ? ` · ${s.kind === "intent" ? "" : logoImg(logos, domainOf(s), "lg sm")}${esc(who(s, redact))}` : ""}</div><div class="reasons">${reasonChips(s)}</div></td>
 </tr>`,
     )
     .join("");
 
   const accountRows = r.accounts
-    .map((a) => `<tr><td>${scorePill(a.score)}</td><td><div class="t">${esc(a.company)}</div><div class="meta num">${esc(a.domain ?? "")}</div></td><td class="r num">${a.signals}</td><td>${a.kinds.map(kindChip).join(" ")}</td></tr>`)
+    .map((a) => `<tr><td>${scorePill(a.score)}</td><td><div class="t">${logoImg(logos, a.domain ?? c.accounts.list.find((x) => x.name === a.company)?.domain)}${esc(a.company)}</div><div class="meta num">${esc(a.domain ?? "")}</div></td><td class="r num">${a.signals}</td><td>${a.kinds.map(kindChip).join(" ")}</td></tr>`)
     .join("");
 
   const topSignals = top ? r.signals.filter((s) => (s.domain && s.domain === top.domain) || (s.company && s.company === top.company)) : [];
   const detail = top
-    ? `<aside class="panel detail"><div class="ph"><div><div class="label">Account</div><div class="h2">${esc(top.company)}</div><div class="meta num">${esc(top.domain ?? "")}</div></div>${scorePill(top.score)}</div>
+    ? `<aside class="panel detail"><div class="ph"><div><div class="label">Account</div><div class="h2">${logoImg(logos, top.domain ?? c.accounts.list.find((x) => x.name === top.company)?.domain)}${esc(top.company)}</div><div class="meta num">${esc(top.domain ?? "")}</div></div>${scorePill(top.score)}</div>
 <div class="label pad">What changed since the last run</div>
-${topSignals.filter((s) => s.isNew).map(detailItem).join("") || `<div class="empty">Nothing new at this account.</div>`}
-${topSignals.some((s) => !s.isNew) ? `<div class="label pad">Seen in earlier runs</div>${topSignals.filter((s) => !s.isNew).map(detailItem).join("")}` : ""}</aside>`
+${topSignals.filter((s) => s.isNew).map((s) => detailItem(s, redact)).join("") || `<div class="empty">Nothing new at this account.</div>`}
+${topSignals.some((s) => !s.isNew) ? `<div class="label pad">Seen in earlier runs</div>${topSignals.filter((s) => !s.isNew).map((s) => detailItem(s, redact)).join("")}` : ""}</aside>`
     : "";
 
   const changeCards = changes.length
-    ? changes.map((s) => `<div class="change">${scorePill(s.score)}<div><div>${kindChip(s.kind)} <span class="meta num">${esc(s.domain ?? s.query)}</span></div><div class="t">${titleLink(s)}</div>${diffLines(s)}<div class="reasons">${reasonChips(s, 3)}</div></div></div>`).join("")
+    ? changes.map((s) => `<div class="change">${scorePill(s.score)}<div><div>${kindChip(s.kind)} <span class="meta num">${esc(s.domain ?? s.query)}</span></div><div class="t">${titleLink(s, redact)}</div>${diffLines(s)}<div class="reasons">${reasonChips(s, 3)}</div></div></div>`).join("")
     : `<div class="empty">No tech stack or page changes this run. The first run stores a baseline.</div>`;
 
   const foundBy: Record<string, number> = {};
@@ -120,7 +147,7 @@ ${topSignals.some((s) => !s.isNew) ? `<div class="label pad">Seen in earlier run
     ["Minimum score", `<span class="num">${c.minScore}</span>, Slack and webhook from <span class="num">${c.notify.minScore}</span>`],
     ["Intent queries", list(c.intent.enabled ? c.intent.queries : [])],
     ["Hiring titles", list(c.hiring.enabled ? c.hiring.titles : [])],
-    ["Watched accounts", list(c.accounts.list.map((a) => a.domain ?? a.name))],
+    ["Watched accounts", c.accounts.list.length ? c.accounts.list.map((a) => `<span class="tok acct">${logoImg(logos, a.domain)}${esc(a.name)} <span class="num meta">${esc(a.domain ?? "")}</span></span>`).join(" ") : `<span class="meta">none</span>`],
     ["Competitor tech", list(c.accounts.competitorTech)],
   ]
     .map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`)
@@ -148,7 +175,7 @@ ${NAV.map(([id, label], n) => `<a href="#${id}"${n === 0 ? ' class="on"' : ""}>$
 <div class="spend"><div class="label">Spend this run</div><div class="num big">${usd(r.costMicros)}</div><div class="sbar"><span style="width:${spentPct}%"></span></div><div class="cap2">of the ${usd(budget)} budget</div></div>
 <div class="powered">Powered by looot</div></nav>
 <main>
-<header class="top"><div class="crumb">Runs <span>/</span> <b>${esc(when)}</b></div><div class="acts">${i.label ? `<span class="pill">${esc(i.label)}</span>` : ""}${runBtn}</div></header>
+<header class="top"><div class="crumb">Runs <span>/</span> <b>${esc(when)}</b></div><div class="acts">${i.label ? `<span class="pill${/^live\b/i.test(i.label) ? " live" : ""}">${esc(i.label)}</span>` : ""}${runBtn}</div></header>
 <section class="head"><h1>${esc(c.product || "Signals")}</h1><div class="meta"><span class="num">${r.calls}</span> calls · <span class="num">${usd(r.costMicros)}</span> spent · minimum score <span class="num">${c.minScore}</span></div></section>
 <section class="stats">
 <div><div class="label">Leads found</div><div class="stat">${r.signals.length}</div><div class="meta"><b class="up">${fresh.length} new</b> since the last run</div></div>
@@ -165,11 +192,11 @@ ${detail}</section>
 <section class="two">
 <div class="panel" id="sources"><div class="ph"><div class="h2">Sources <span class="meta">next run, worst case</span></div></div>
 <table class="tbl"><thead><tr><th>Source</th><th class="r">Calls</th><th class="r">At most</th><th class="r">Found</th></tr></thead><tbody>${sourceRows || `<tr><td colspan="4" class="empty">No quote in this report.</td></tr>`}</tbody></table></div>
-<div class="panel" id="costs"><div class="ph"><div class="h2">Costs <span class="meta">last ${Math.min(14, runs.length)} runs</span></div></div>
+<div class="panel" id="costs"><div class="ph"><div class="h2">Costs <span class="meta">last ${Math.min(14, runs.length) === 1 ? "run" : `${Math.min(14, runs.length)} runs`}</span></div></div>
 <table class="tbl"><colgroup><col style="width:160px"><col style="width:60px"><col style="width:90px"><col><col style="width:60px"><col style="width:50px"></colgroup><thead><tr><th>Run</th><th class="r">Calls</th><th class="r">Spent</th><th></th><th class="r">Found</th><th class="r">New</th></tr></thead><tbody>${runRows || `<tr><td colspan="6" class="empty">No earlier runs in the state file.</td></tr>`}</tbody></table></div>
 </section>
 <section class="panel" id="settings"><div class="ph"><div class="h2">Settings <span class="meta">from icp.json, edit the file to change them</span></div></div><table class="kv">${settings}</table></section>
-<footer class="meta">Generated by looot-signal-listener on ${esc(r.at)}. Static file, no tracking, no network requests.</footer>
+<footer class="meta">Generated by looot-signal-listener on ${esc(r.at)}. Static file, no tracking, no network requests.${hasLogos ? `<br>Logos and names belong to their owners. Public data from a live run on ${esc(r.at.slice(0, 10))}. No affiliation.` : ""}</footer>
 </main>
 ${dialog}
 <script>if(location.hash==="#quote"){var d=document.getElementById("quote");if(d)d.showModal()}</script>
@@ -203,6 +230,7 @@ main{min-width:0}section{scroll-margin-top:48px}
 .crumb{color:var(--muted)}.crumb b{color:var(--text);font-weight:500}.crumb span{margin:0 6px}
 .acts{display:flex;align-items:center;gap:10px}
 .pill{font-size:11.5px;font-weight:500;color:var(--warn);background:#fbf3df;border:1px solid #ecd9a6;border-radius:999px;padding:1px 9px}
+.pill.live{color:var(--accent-text);background:var(--selected);border-color:#cfe8da}
 .btn{font:500 13px var(--sans);background:var(--brand);color:var(--brand-fg);border:0;border-radius:6px;padding:7px 12px;display:inline-flex;align-items:center;gap:8px;cursor:pointer}
 .btn i{width:3px;height:3px;border-radius:50%;background:#8fc7ae}.btn b{font-weight:500}
 .btn.ghost{background:var(--surface);color:var(--text);border:1px solid var(--rule-strong)}
@@ -244,6 +272,8 @@ section.panel,.two{border-top:1px solid var(--rule)}
 .kv td{padding:9px 24px 9px 0;border-top:1px solid var(--rule)}
 .tok{display:inline-block;font-size:12px;background:var(--bg);border:1px solid var(--rule);border-radius:5px;padding:0 6px;margin:0 2px 4px 0}
 .empty{color:var(--muted);padding:16px 24px}
+.lg{display:inline-block;width:16px;height:16px;border-radius:4px;vertical-align:-3px;margin-right:7px;object-fit:contain}.lg.sm{width:13px;height:13px;margin-right:5px;vertical-align:-2px}
+.h2 .lg{width:20px;height:20px;vertical-align:-4px}.tok.acct{font-family:var(--sans);padding:2px 8px}.tok.acct .lg{width:14px;height:14px}
 footer{padding:16px 24px 40px}
 dialog:focus{outline:none}dialog{border:1px solid var(--rule-strong);border-radius:8px;padding:0;width:440px;color:var(--text);box-shadow:0 12px 32px -12px rgb(11 46 34/.22),0 2px 6px -2px rgb(11 46 34/.08)}
 dialog::backdrop{background:rgb(11 46 34/.18)}

@@ -227,7 +227,8 @@ export function parseCustom(cs: CustomSource) {
 const window = (days: number) => ({
   reddit: days <= 1 ? "day" : days <= 7 ? "week" : days <= 31 ? "month" : "year",
   tbs: days <= 1 ? "qdr:d" : days <= 7 ? "qdr:w" : days <= 31 ? "qdr:m" : "qdr:y",
-  jobs: days <= 1 ? "past 24 hours" : days <= 7 ? "past week" : "past month",
+  // anyapi-run-linkedin-jobs-thin accepts only these three values (a live run on 2026-10-13 rejected "past week").
+  jobs: days <= 1 ? "24h" : days <= 7 ? "week" : "month",
 });
 
 const fill = (v: unknown, q: string, days: number): unknown =>
@@ -276,7 +277,7 @@ export function planCalls(c: Config, now: Date): PlannedCall[] {
 
   for (const a of c.accounts.list) {
     const domain = hostOf(a.domain);
-    if (c.accounts.news) calls.push({ source: "news", label: a.name, endpointId: ENDPOINTS.news.id, input: { q: `"${a.name.replace(/"/g, "")}"`, num: 10, tbs: w.tbs }, maxUnits: 1, fallbackMicros: ENDPOINTS.news.micros, parse: (r, n) => parseNews("news", "news", a.name, domain)(r, n, a.name) });
+    if (c.accounts.news) calls.push({ source: "news", label: a.name, endpointId: ENDPOINTS.news.id, input: { q: a.newsQuery || `"${a.name.replace(/"/g, "")}"`, num: 10, tbs: w.tbs }, maxUnits: 1, fallbackMicros: ENDPOINTS.news.micros, parse: (r, n) => parseNews("news", "news", a.name, domain)(r, n, a.name) });
     if (c.accounts.techstack && domain) calls.push({ source: "techstack", label: domain, endpointId: ENDPOINTS.techstack.id, input: { domain }, maxUnits: 1, fallbackMicros: ENDPOINTS.techstack.micros, parse: () => [], snapshotKey: `tech:${domain}` });
     if (c.accounts.website) {
       for (const page of a.pages ?? []) calls.push({ source: "website", label: page, endpointId: ENDPOINTS.page.id, input: { url: page }, maxUnits: 1, fallbackMicros: ENDPOINTS.page.micros, parse: () => [], snapshotKey: `page:${canonicalUrl(page)}` });
